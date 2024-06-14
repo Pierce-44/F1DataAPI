@@ -1,0 +1,6 @@
+@F1DataAPI_HostAddress = http://localhost:5230
+
+GET {{F1DataAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
