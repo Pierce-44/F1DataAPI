@@ -206,12 +206,7 @@ app.MapPost("/sync-drivers-results", async (AppDbContext db, IHttpClientFactory 
 
 });
 
-
-app.MapHelloWorldEndpoint();
-
 app.Run();
-
-
 
 public class ErgastApiDriverResponse
 {
