@@ -1,7 +1,5 @@
 {
   "functions": {
-    "api/**/*.cs": {
-      "runtime": "vercel-dotnet@0.0.4"
-    }
+    "api/**/*.cs": {}
   }
 }
