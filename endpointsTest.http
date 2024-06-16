@@ -1,0 +1,29 @@
+
+### POST Request to sync drivers from external API
+POST http://localhost:5041/sync-drivers
+### GET Request to fetch all drivers
+GET http://localhost:5041/drivers
+
+
+
+
+
+
+
+###
+POST http://localhost:5041/sync-drivers-results
+
+###
+GET http://localhost:5041/drivers/hamilton/results
+
+
+
+
+
+
+
+###
+POST http://localhost:5041/sync-calendar
+
+###
+GET http://localhost:5041/calendar
