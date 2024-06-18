@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 
-class AppDbContext : DbContext
-{
-    public AppDbContext(DbContextOptions<AppDbContext> options)
-        : base(options) { }
 
+public class AppDbContext(DbContextOptions<AppDbContext> options)
+    : DbContext(options)
+{
     public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<DriverResult> DriverResults => Set<DriverResult>();
     public DbSet<Race> Races => Set<Race>();
@@ -16,9 +15,8 @@ class AppDbContext : DbContext
     public DbSet<ConstructorDetail> Constructor => Set<ConstructorDetail>();
     public DbSet<CalendarRace> Calendar => Set<CalendarRace>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        base.OnModelCreating(modelBuilder);
-    }
 
 }
+
+
+

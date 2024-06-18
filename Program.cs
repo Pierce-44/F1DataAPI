@@ -2,13 +2,18 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+var connString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddSqlite<AppDbContext>(connString);
 
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
+
+var port = Environment.GetEnvironmentVariable("PORT");
+app.Urls.Add($"http://*:{port}");
+
+app.MigrateDb();
 
 // Configure the HTTP request pipeline
 app.MapGet("/", () => "Welcome to the F1 API!");
