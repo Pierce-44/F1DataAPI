@@ -10,10 +10,10 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-var port = Environment.GetEnvironmentVariable("PORT");
-app.Urls.Add($"http://*:{port}");
+// var port = Environment.GetEnvironmentVariable("PORT");
+// app.Urls.Add($"http://*:{port}");
 
-app.MigrateDb();
+// app.MigrateDb();
 
 // Configure the HTTP request pipeline
 app.MapGet("/", () => "Welcome to the F1 API!");
