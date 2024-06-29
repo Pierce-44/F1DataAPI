@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,8 +11,11 @@ builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// var port = Environment.GetEnvironmentVariable("PORT");
-// app.Urls.Add($"http://*:{port}");
+
+// REMOVE FOR LOCAL TESTING
+// no need to hide this part always uses 80 now
+var port = Environment.GetEnvironmentVariable("PORT");
+app.Urls.Add($"http://*:{port}");
 
 // app.MigrateDb();
 
@@ -41,6 +45,8 @@ app.MapGet("/drivers/{driverId}/results", async (AppDbContext db, string driverI
         .Include(dr => dr.Races)
             .ThenInclude(r => r.Results)
                 .ThenInclude(res => res.Constructor)
+        .Include(dr => dr.Races)
+                .ThenInclude(res => res.Circuit)
         .FirstOrDefaultAsync();
 
     return Results.Ok(driverResults);
@@ -72,6 +78,117 @@ app.MapPost("/sync-drivers", async (AppDbContext db, IHttpClientFactory httpClie
 });
 
 
+app.MapPost("/sync-teams", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
+{
+    var client = httpClientFactory.CreateClient();
+    var responseConstructors = await client.GetFromJsonAsync<ErgastApiConstructorsResponse>("http://ergast.com/api/f1/2024/constructors.json");
+
+    if (responseConstructors == null)
+        return Results.BadRequest();
+
+    foreach (var team in responseConstructors.MRData.ConstructorTable.Constructors)
+    {
+        if (!db.Teams.Any(dbTeam => dbTeam.constructorId == team.constructorId))
+        {
+            var constructorId = team.constructorId;
+            var responseTeam = await client.GetFromJsonAsync<ErgastApiTeamResponse>($"http://ergast.com/api/f1/2024/constructors/{constructorId}/drivers.json");
+
+
+            db.Teams.Add(new Team
+            {
+                constructorId = team.constructorId,
+                Drivers = responseTeam.MRData.DriverTable.Drivers.Select(driverHere => new TeamDrivers
+                {
+                    familyName = driverHere.familyName,
+                    givenName = driverHere.givenName,
+                    driverId = driverHere.driverId
+                }).ToList() ?? new List<TeamDrivers>()
+            });
+        }
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Ok(await db.Teams.ToListAsync());
+});
+
+
+app.MapGet("/teams", async (AppDbContext db) =>
+{
+    var teams = await db.Teams
+        .Include(team => team.Drivers)
+        .ToListAsync();
+
+    return Results.Ok(teams);
+});
+
+app.MapPost("/sync-driver-qualy", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
+{
+
+    var DriversArray = db.Drivers;
+
+
+    foreach (var driver in DriversArray)
+    {
+        var driverId = driver.driverId;
+
+        var client = httpClientFactory.CreateClient();
+        var response = await client.GetFromJsonAsync<ErgastApiQualiResponse>($"http://ergast.com/api/f1/2024/drivers/{driverId}/qualifying.json");
+
+        if (!db.DriverQualyResults.Any(d => d.driverId == driver.driverId))
+        {
+            var driverResult = new DriverQualyResults
+            {
+                driverId = driver.driverId,
+                Races = response.MRData.RaceTable.Races.Select(apiRace => new RacesQualy
+                {
+                    raceName = apiRace.raceName,
+                    Circuit = new QualyCircuit
+                    {
+                        circuitId = apiRace.Circuit.circuitId
+                    },
+                    QualifyingResults = apiRace.QualifyingResults.Select(result =>
+                    new QualifyingResults
+                    {
+                        position = result.position,
+                        Driver = new QualyDriver
+                        {
+                            familyName = result.Driver.familyName,
+                            givenName = result.Driver.givenName
+                        }
+                    }).ToList()
+                }).ToList()
+            };
+            db.DriverQualyResults.Add(driverResult);
+            await db.SaveChangesAsync();
+        }
+
+    }
+    var driverResults = await db.DriverQualyResults
+        .Include(dr => dr.Races)
+            .ThenInclude(r => r.QualifyingResults)
+                .ThenInclude(qr => qr.Driver)
+        .Include(dr => dr.Races)
+            .ThenInclude(r => r.Circuit)
+          .FirstOrDefaultAsync();
+
+    return Results.Ok(driverResults);
+
+});
+
+app.MapGet("/qualyfying/{driverId}/results", async (AppDbContext db, string driverId) =>
+{
+    var driverResults = await db.DriverQualyResults
+    .Where(dr => dr.driverId == driverId)
+        .Include(dr => dr.Races)
+            .ThenInclude(r => r.QualifyingResults)
+                .ThenInclude(qr => qr.Driver)
+        .Include(dr => dr.Races)
+            .ThenInclude(r => r.Circuit)
+          .FirstOrDefaultAsync();
+
+    return Results.Ok(driverResults);
+});
+
 app.MapPost("/sync-calendar", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
 {
     var client = httpClientFactory.CreateClient();
@@ -93,6 +210,12 @@ app.MapPost("/sync-calendar", async (AppDbContext db, IHttpClientFactory httpCli
                 {
                     date = race.Qualifying.date,
                     time = race.Qualifying.time,
+                },
+                Circuit = new CalendarCircuit
+                {
+                    circuitId = race.Circuit.circuitId,
+                    circuitName = race.Circuit.circuitName,
+                    Location = race.Circuit.Location,
                 }
             });
         }
@@ -106,6 +229,8 @@ app.MapGet("/calendar", async (AppDbContext db) =>
 {
     var calendarResults = await db.Calendar
         .Include(race => race.Qualifying)
+        .Include(race => race.Circuit)
+            .ThenInclude(c => c.Location)
         .ToListAsync();
 
     return Results.Ok(calendarResults);
@@ -129,12 +254,19 @@ app.MapPost("/sync-drivers-results", async (AppDbContext db, IHttpClientFactory 
                 driverId = driverId,
                 Races = response.MRData.RaceTable.Races.Select(apiRace => new Race
                 {
+                    raceName = apiRace.raceName,
+                    Circuit = new CircuitDriver
+                    {
+                        circuitId = apiRace.Circuit.circuitId,
+                        circuitName = apiRace.Circuit.circuitName
+                    },
                     Results = apiRace.Results?.Select(apiResult => new Result
                     {
                         position = apiResult?.position ?? "unknown",
                         positionText = apiResult?.positionText ?? "unknown",
                         points = apiResult?.points ?? "unknown",
                         grid = apiResult?.grid ?? "unknown",
+
                         Time = apiResult?.Time != null ? new TimeDetail
                         {
                             time = apiResult.Time.time ?? "unknown",
@@ -177,10 +309,12 @@ app.MapPost("/sync-drivers-results", async (AppDbContext db, IHttpClientFactory 
                         },
                         Constructor = apiResult?.Constructor != null ? new ConstructorDetail
                         {
-                            name = apiResult.Constructor.name ?? "unknown"
+                            name = apiResult.Constructor.name ?? "unknown",
+                            constructorId = apiResult.Constructor.constructorId ?? "unknown"
                         } : new ConstructorDetail
                         {
-                            name = "unknown"
+                            name = "unknown",
+                            constructorId = "unknown"
                         }
                     }).ToList() ?? new List<Result>()
                 }).ToList()
@@ -260,10 +394,91 @@ public class RaceInfo
     public string date { get; set; }
     public string time { get; set; }
     public QualifyingTime Qualifying { get; set; }
-
+    public CalendarCircuit Circuit { get; set; }
 }
 public class QualifyingTime
 {
     public string date { get; set; }
     public string time { get; set; }
+}
+
+public class ErgastApiConstructorsResponse
+{
+    public ConstructorMRData MRData { get; set; }
+}
+
+public class ConstructorMRData
+{
+    public ConstructorTable ConstructorTable { get; set; }
+}
+
+public class ConstructorTable
+{
+    public List<ErgastConstructor> Constructors { get; set; }
+}
+
+public class ErgastConstructor
+{
+    public string constructorId { get; set; }
+}
+
+public class ErgastApiTeamResponse
+{
+    public TeamMRData MRData { get; set; }
+}
+
+public class TeamMRData
+{
+    public TeamDriverTable DriverTable { get; set; }
+}
+
+public class TeamDriverTable
+{
+    public List<ErgastTeamDrivers> Drivers { get; set; }
+}
+
+public class ErgastTeamDrivers
+{
+    public string familyName { get; set; }
+    public string givenName { get; set; }
+    public string driverId { get; set; }
+}
+public class ErgastApiQualiResponse
+{
+    public QualyMRData MRData { get; set; }
+}
+
+public class QualyMRData
+{
+    public ErgastQualyRaceTable RaceTable { get; set; }
+}
+
+public class ErgastQualyRaceTable
+{
+    public List<ErgastQualyRaces> Races { get; set; }
+}
+
+public class ErgastQualyRaces
+{
+    public string raceName { get; set; }
+    public ErgastCircuit Circuit { get; set; }
+    public List<ErgastQualifyingResults> QualifyingResults { get; set; }
+}
+
+public class ErgastCircuit
+{
+    public string circuitId { get; set; }
+}
+
+public class ErgastQualifyingResults
+{
+    public string position { get; set; }
+    public ErgastQualyDriver Driver { get; set; }
+}
+
+public class ErgastQualyDriver
+{
+    public string familyName { get; set; }
+    public string givenName { get; set; }
+
 }

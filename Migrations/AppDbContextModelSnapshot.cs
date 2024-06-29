@@ -31,10 +31,56 @@ namespace F1DataAPI.Migrations
                     b.ToTable("AverageSpeed");
                 });
 
+            modelBuilder.Entity("CalendarCircuit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LocationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("circuitId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("circuitName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId");
+
+                    b.ToTable("CalendarCircuit");
+                });
+
+            modelBuilder.Entity("CalendarLocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("country")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("locality")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CalendarLocation");
+                });
+
             modelBuilder.Entity("CalendarRace", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CircuitId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("QualifyingId")
@@ -54,9 +100,30 @@ namespace F1DataAPI.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CircuitId");
+
                     b.HasIndex("QualifyingId");
 
                     b.ToTable("Calendar");
+                });
+
+            modelBuilder.Entity("CircuitDriver", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("circuitId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("circuitName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CircuitDriver");
                 });
 
             modelBuilder.Entity("ConstructorDetail", b =>
@@ -64,6 +131,10 @@ namespace F1DataAPI.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("constructorId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("name")
                         .IsRequired()
@@ -128,6 +199,21 @@ namespace F1DataAPI.Migrations
                     b.ToTable("Driver");
                 });
 
+            modelBuilder.Entity("DriverQualyResults", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("driverId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DriverQualyResults");
+                });
+
             modelBuilder.Entity("DriverResult", b =>
                 {
                     b.Property<int>("Id")
@@ -178,20 +264,113 @@ namespace F1DataAPI.Migrations
                     b.ToTable("Qualifying");
                 });
 
+            modelBuilder.Entity("QualifyingResults", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DriverId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RacesQualyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("position")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverId");
+
+                    b.HasIndex("RacesQualyId");
+
+                    b.ToTable("QualifyingResults");
+                });
+
+            modelBuilder.Entity("QualyCircuit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("circuitId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("QualyCircuit");
+                });
+
+            modelBuilder.Entity("QualyDriver", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("familyName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("givenName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("QualyDriver");
+                });
+
             modelBuilder.Entity("Race", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("CircuitId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("DriverResultId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("raceName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CircuitId");
 
                     b.HasIndex("DriverResultId");
 
                     b.ToTable("Races");
+                });
+
+            modelBuilder.Entity("RacesQualy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CircuitId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DriverQualyResultsId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("raceName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CircuitId");
+
+                    b.HasIndex("DriverQualyResultsId");
+
+                    b.ToTable("RacesQualy");
                 });
 
             modelBuilder.Entity("Result", b =>
@@ -246,6 +425,49 @@ namespace F1DataAPI.Migrations
                     b.ToTable("Results");
                 });
 
+            modelBuilder.Entity("Team", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("constructorId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Teams");
+                });
+
+            modelBuilder.Entity("TeamDrivers", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TeamId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("driverId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("familyName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("givenName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("TeamDrivers");
+                });
+
             modelBuilder.Entity("TimeDetail", b =>
                 {
                     b.Property<int>("Id")
@@ -265,13 +487,32 @@ namespace F1DataAPI.Migrations
                     b.ToTable("Time");
                 });
 
+            modelBuilder.Entity("CalendarCircuit", b =>
+                {
+                    b.HasOne("CalendarLocation", "Location")
+                        .WithMany()
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Location");
+                });
+
             modelBuilder.Entity("CalendarRace", b =>
                 {
+                    b.HasOne("CalendarCircuit", "Circuit")
+                        .WithMany()
+                        .HasForeignKey("CircuitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Qualifying", "Qualifying")
                         .WithMany()
                         .HasForeignKey("QualifyingId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Circuit");
 
                     b.Navigation("Qualifying");
                 });
@@ -287,11 +528,49 @@ namespace F1DataAPI.Migrations
                     b.Navigation("AverageSpeed");
                 });
 
+            modelBuilder.Entity("QualifyingResults", b =>
+                {
+                    b.HasOne("QualyDriver", "Driver")
+                        .WithMany()
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("RacesQualy", null)
+                        .WithMany("QualifyingResults")
+                        .HasForeignKey("RacesQualyId");
+
+                    b.Navigation("Driver");
+                });
+
             modelBuilder.Entity("Race", b =>
                 {
+                    b.HasOne("CircuitDriver", "Circuit")
+                        .WithMany()
+                        .HasForeignKey("CircuitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("DriverResult", null)
                         .WithMany("Races")
                         .HasForeignKey("DriverResultId");
+
+                    b.Navigation("Circuit");
+                });
+
+            modelBuilder.Entity("RacesQualy", b =>
+                {
+                    b.HasOne("QualyCircuit", "Circuit")
+                        .WithMany()
+                        .HasForeignKey("CircuitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DriverQualyResults", null)
+                        .WithMany("Races")
+                        .HasForeignKey("DriverQualyResultsId");
+
+                    b.Navigation("Circuit");
                 });
 
             modelBuilder.Entity("Result", b =>
@@ -333,6 +612,18 @@ namespace F1DataAPI.Migrations
                     b.Navigation("Time");
                 });
 
+            modelBuilder.Entity("TeamDrivers", b =>
+                {
+                    b.HasOne("Team", null)
+                        .WithMany("Drivers")
+                        .HasForeignKey("TeamId");
+                });
+
+            modelBuilder.Entity("DriverQualyResults", b =>
+                {
+                    b.Navigation("Races");
+                });
+
             modelBuilder.Entity("DriverResult", b =>
                 {
                     b.Navigation("Races");
@@ -341,6 +632,16 @@ namespace F1DataAPI.Migrations
             modelBuilder.Entity("Race", b =>
                 {
                     b.Navigation("Results");
+                });
+
+            modelBuilder.Entity("RacesQualy", b =>
+                {
+                    b.Navigation("QualifyingResults");
+                });
+
+            modelBuilder.Entity("Team", b =>
+                {
+                    b.Navigation("Drivers");
                 });
 #pragma warning restore 612, 618
         }

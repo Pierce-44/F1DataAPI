@@ -1,4 +1,6 @@
 
+using Microsoft.AspNetCore.Components.Server.Circuits;
+
 public class DriverResult
 {
     public int Id { get; set; }
@@ -9,6 +11,8 @@ public class DriverResult
 public class Race
 {
     public int Id { get; set; }
+    public string raceName { get; set; }
+    public CircuitDriver Circuit { get; set; }
     public List<Result> Results { get; set; }
 }
 
@@ -19,12 +23,20 @@ public class Result
     public string positionText { get; set; }
     public string points { get; set; }
     public string grid { get; set; }
+
     // public string status { get; set; }
     public TimeDetail Time { get; set; }
     public FastestLapDetail FastestLap { get; set; }
     public DriverDetail Driver { get; set; }
     public ConstructorDetail Constructor { get; set; }
 
+}
+
+public class CircuitDriver
+{
+    public int Id { get; set; }
+    public string circuitId { get; set; }
+    public string circuitName { get; set; }
 }
 
 public class TimeDetail
@@ -60,4 +72,6 @@ public class ConstructorDetail
 {
     public int Id { get; set; }
     public string name { get; set; }
+    public string constructorId { get; set; }
+
 }

@@ -1,9 +1,11 @@
 
 ###
+POST https://f1-data-api-d7f25ebaa706.herokuapp.com/sync-drivers
 ###
-POST http://localhost:80/sync-drivers
+POST http://localhost:5041/sync-drivers
 
 ###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/drivers
 ###
 GET http://localhost:5041/drivers
 
@@ -12,10 +14,12 @@ GET http://localhost:5041/drivers
 
 
 ###
+POST https://f1-data-api-d7f25ebaa706.herokuapp.com/sync-drivers-results
 ###
-POST http://localhost:80/sync-drivers-results
+POST http://localhost:5041/sync-drivers-results
 
 ###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/drivers/hamilton/results
 ###
 GET http://localhost:5041/drivers/hamilton/results
 
@@ -25,10 +29,50 @@ GET http://localhost:5041/drivers/hamilton/results
 
 
 ###
+POST https://f1-data-api-d7f25ebaa706.herokuapp.com/sync-calendar
 ###
-POST http://localhost:80/sync-calendar
+POST http://localhost:5041/sync-calendar
 
 
 ###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/calendar
 ###
-GET http://localhost:80/calendar
+GET http://localhost:5041/calendar
+
+
+
+
+###
+POST https://f1-data-api-d7f25ebaa706.herokuapp.com/sync-teams
+###
+POST http://localhost:5041/sync-teams
+
+
+
+
+###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/teams
+###
+GET http://localhost:5041/teams 
+
+
+
+
+
+
+
+###
+POST https://f1-data-api-d7f25ebaa706.herokuapp.com/sync-driver-qualy
+###
+POST http://localhost:5041/sync-driver-qualy
+
+
+
+
+
+
+
+###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/qualyfying/hamilton/results 
+###
+GET http://localhost:5041/qualyfying/hamilton/results

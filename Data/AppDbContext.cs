@@ -14,8 +14,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DriverDetail> Driver => Set<DriverDetail>();
     public DbSet<ConstructorDetail> Constructor => Set<ConstructorDetail>();
     public DbSet<CalendarRace> Calendar => Set<CalendarRace>();
-
-
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<DriverQualyResults> DriverQualyResults => Set<DriverQualyResults>();
 }
 
 
