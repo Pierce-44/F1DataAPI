@@ -29,8 +29,8 @@ var app = builder.Build();
 
 // REMOVE FOR LOCAL TESTING
 // no need to hide this part always uses 80 now
-// var port = Environment.GetEnvironmentVariable("PORT");
-// app.Urls.Add($"http://*:{port}");
+var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
+app.Urls.Add($"http://*:{port}");
 
 app.MapPost("/sync-drivers", async (IHttpClientFactory httpClientFactory) =>
 {

@@ -12,6 +12,12 @@ POST http://localhost:5041/sync-drivers-results
 ###
 GET http://localhost:5041/drivers/hamilton/results
 
+###
+GET http://localhost:80/drivers/hamilton/results
+###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/drivers/hamilton/results
+
+
 
 
 
@@ -19,8 +25,10 @@ GET http://localhost:5041/drivers/hamilton/results
 POST http://localhost:5041/sync-calendar
 ###
 GET http://localhost:5041/calendar
-
-
+###
+GET http://localhost:80/calendar
+###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/calendar
 
 
 ###
