@@ -1,16 +1,18 @@
 
-using Microsoft.AspNetCore.Components.Server.Circuits;
+
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
 public class DriverResult
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string driverId { get; set; }
     public List<Race> Races { get; set; }
 }
 
 public class Race
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string raceName { get; set; }
     public CircuitDriver Circuit { get; set; }
     public List<Result> Results { get; set; }
@@ -18,7 +20,7 @@ public class Race
 
 public class Result
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string position { get; set; }
     public string positionText { get; set; }
     public string points { get; set; }
@@ -34,33 +36,33 @@ public class Result
 
 public class CircuitDriver
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string circuitId { get; set; }
     public string circuitName { get; set; }
 }
 
 public class TimeDetail
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string time { get; set; }
     public string millis { get; set; }
 }
 
 public class FastestLapDetail
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public AverageSpeedDetail AverageSpeed { get; set; }
 }
 
 public class AverageSpeedDetail
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string speed { get; set; }
 }
 
 public class DriverDetail
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string nationality { get; set; }
     public string dateOfBirth { get; set; }
     public string permanentNumber { get; set; }
@@ -70,7 +72,7 @@ public class DriverDetail
 
 public class ConstructorDetail
 {
-    public int Id { get; set; }
+    public ObjectId Id { get; set; }
     public string name { get; set; }
     public string constructorId { get; set; }
 

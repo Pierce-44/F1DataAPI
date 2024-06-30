@@ -1,70 +1,52 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
+using MongoDB.Bson;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionUri = builder.Configuration.GetConnectionString("MongoDb");
 
-builder.Services.AddSqlite<AppDbContext>(connString);
+var settings = MongoClientSettings.FromConnectionString(connectionUri);
+
+// Set the ServerApi field of the settings object to set the version of the Stable API on the client
+settings.ServerApi = new ServerApi(ServerApiVersion.V1);
+
+// Create a new client and connect to the server
+var client = new MongoClient(settings);
+
+var driversCollection = client.GetDatabase("f1fastfacts").GetCollection<Driver>("drivers");
+var driversResultsCollection = client.GetDatabase("f1fastfacts").GetCollection<DriverResult>("driverResults");
+var calendarCollection = client.GetDatabase("f1fastfacts").GetCollection<CalendarRace>("calendar");
+var teamCollection = client.GetDatabase("f1fastfacts").GetCollection<Team>("teams");
+var driverQualyCollection = client.GetDatabase("f1fastfacts").GetCollection<DriverQualyResults>("driverQualyResults");
+
 
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-
 // REMOVE FOR LOCAL TESTING
 // no need to hide this part always uses 80 now
-var port = Environment.GetEnvironmentVariable("PORT");
-app.Urls.Add($"http://*:{port}");
+// var port = Environment.GetEnvironmentVariable("PORT");
+// app.Urls.Add($"http://*:{port}");
 
-// app.MigrateDb();
-
-// Configure the HTTP request pipeline
-app.MapGet("/", () => "Welcome to the F1 API!");
-
-app.MapGet("/drivers", async (AppDbContext db) =>
+app.MapPost("/sync-drivers", async (IHttpClientFactory httpClientFactory) =>
 {
-    return await db.Drivers.ToListAsync();
-});
-
-app.MapGet("/drivers/{driverId}/results", async (AppDbContext db, string driverId) =>
-{
-
-    var driverResults = await db.DriverResults
-        .Where(dr => dr.driverId == driverId)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.Time)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.FastestLap)
-                    .ThenInclude(f => f.AverageSpeed)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.Driver)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.Constructor)
-        .Include(dr => dr.Races)
-                .ThenInclude(res => res.Circuit)
-        .FirstOrDefaultAsync();
-
-    return Results.Ok(driverResults);
-});
-
-app.MapPost("/sync-drivers", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
-{
-    var client = httpClientFactory.CreateClient();
-    var response = await client.GetFromJsonAsync<ErgastApiDriverResponse>("http://ergast.com/api/f1/2024/drivers.json");
+    var clientFetch = httpClientFactory.CreateClient();
+    var response = await clientFetch.GetFromJsonAsync<ErgastApiDriverResponse>("http://ergast.com/api/f1/2024/drivers.json");
 
     if (response == null)
         return Results.BadRequest();
 
+    var driversList = await driversCollection.Find(new BsonDocument()).ToListAsync();
+
     foreach (var driver in response.MRData.DriverTable.Drivers)
     {
-        if (!db.Drivers.Any(d => d.driverId == driver.driverId))
+        if (!driversList.Any(d => d.driverId == driver.driverId))
         {
-            db.Drivers.Add(new Driver
+            await driversCollection.InsertOneAsync(new Driver
             {
                 driverId = driver.driverId,
                 givenName = driver.givenName,
@@ -73,28 +55,36 @@ app.MapPost("/sync-drivers", async (AppDbContext db, IHttpClientFactory httpClie
         }
     }
 
-    await db.SaveChangesAsync();
-    return Results.Ok(await db.Drivers.ToListAsync());
+    var driversListUpdated = await driversCollection.Find(new BsonDocument()).ToListAsync();
+
+    return Results.Ok(driversListUpdated);
 });
 
-
-app.MapPost("/sync-teams", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
+app.MapGet("/drivers", async () =>
 {
-    var client = httpClientFactory.CreateClient();
-    var responseConstructors = await client.GetFromJsonAsync<ErgastApiConstructorsResponse>("http://ergast.com/api/f1/2024/constructors.json");
+    var driversList = await driversCollection.Find(new BsonDocument()).ToListAsync();
+
+    return Results.Ok(driversList);
+});
+
+app.MapPost("/sync-teams", async (IHttpClientFactory httpClientFactory) =>
+{
+    var clientFetch = httpClientFactory.CreateClient();
+    var responseConstructors = await clientFetch.GetFromJsonAsync<ErgastApiConstructorsResponse>("http://ergast.com/api/f1/2024/constructors.json");
+
+    var teamList = await teamCollection.Find(new BsonDocument()).ToListAsync();
 
     if (responseConstructors == null)
         return Results.BadRequest();
 
     foreach (var team in responseConstructors.MRData.ConstructorTable.Constructors)
     {
-        if (!db.Teams.Any(dbTeam => dbTeam.constructorId == team.constructorId))
+        if (!teamList.Any(dbTeam => dbTeam.constructorId == team.constructorId))
         {
             var constructorId = team.constructorId;
-            var responseTeam = await client.GetFromJsonAsync<ErgastApiTeamResponse>($"http://ergast.com/api/f1/2024/constructors/{constructorId}/drivers.json");
+            var responseTeam = await clientFetch.GetFromJsonAsync<ErgastApiTeamResponse>($"http://ergast.com/api/f1/2024/constructors/{constructorId}/drivers.json");
 
-
-            db.Teams.Add(new Team
+            var newTeam = new Team
             {
                 constructorId = team.constructorId,
                 Drivers = responseTeam.MRData.DriverTable.Drivers.Select(driverHere => new TeamDrivers
@@ -103,38 +93,39 @@ app.MapPost("/sync-teams", async (AppDbContext db, IHttpClientFactory httpClient
                     givenName = driverHere.givenName,
                     driverId = driverHere.driverId
                 }).ToList() ?? new List<TeamDrivers>()
-            });
+            };
+
+            await teamCollection.InsertOneAsync(newTeam);
         }
     }
 
-    await db.SaveChangesAsync();
-    return Results.Ok(await db.Teams.ToListAsync());
+    var teamListUpdated = await teamCollection.Find(new BsonDocument()).ToListAsync();
+
+    return Results.Ok(teamListUpdated);
 });
 
 
-app.MapGet("/teams", async (AppDbContext db) =>
+app.MapGet("/teams", async () =>
 {
-    var teams = await db.Teams
-        .Include(team => team.Drivers)
-        .ToListAsync();
+    var teamList = await teamCollection.Find(new BsonDocument()).ToListAsync();
 
-    return Results.Ok(teams);
+    return Results.Ok(teamList);
 });
 
-app.MapPost("/sync-driver-qualy", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
+app.MapPost("/sync-driver-qualy", async (IHttpClientFactory httpClientFactory) =>
 {
 
-    var DriversArray = db.Drivers;
-
+    var DriversArray = await driversCollection.Find(new BsonDocument()).ToListAsync();
+    var DriversQualyResultsArray = await driverQualyCollection.Find(new BsonDocument()).ToListAsync();
 
     foreach (var driver in DriversArray)
     {
         var driverId = driver.driverId;
 
-        var client = httpClientFactory.CreateClient();
-        var response = await client.GetFromJsonAsync<ErgastApiQualiResponse>($"http://ergast.com/api/f1/2024/drivers/{driverId}/qualifying.json");
+        var clientFetch = httpClientFactory.CreateClient();
+        var response = await clientFetch.GetFromJsonAsync<ErgastApiQualiResponse>($"http://ergast.com/api/f1/2024/drivers/{driverId}/qualifying.json");
 
-        if (!db.DriverQualyResults.Any(d => d.driverId == driver.driverId))
+        if (!DriversQualyResultsArray.Any(d => d.driverId == driver.driverId))
         {
             var driverResult = new DriverQualyResults
             {
@@ -158,50 +149,40 @@ app.MapPost("/sync-driver-qualy", async (AppDbContext db, IHttpClientFactory htt
                     }).ToList()
                 }).ToList()
             };
-            db.DriverQualyResults.Add(driverResult);
-            await db.SaveChangesAsync();
+
+            await driverQualyCollection.InsertOneAsync(driverResult);
         }
-
     }
-    var driverResults = await db.DriverQualyResults
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.QualifyingResults)
-                .ThenInclude(qr => qr.Driver)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Circuit)
-          .FirstOrDefaultAsync();
 
-    return Results.Ok(driverResults);
+    var driverQualyListUpdated = await driverQualyCollection.Find(new BsonDocument()).ToListAsync();
+
+    return Results.Ok(driverQualyListUpdated);
 
 });
 
-app.MapGet("/qualyfying/{driverId}/results", async (AppDbContext db, string driverId) =>
+app.MapGet("/qualyfying/{driverId}/results", async (string driverId) =>
 {
-    var driverResults = await db.DriverQualyResults
-    .Where(dr => dr.driverId == driverId)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.QualifyingResults)
-                .ThenInclude(qr => qr.Driver)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Circuit)
-          .FirstOrDefaultAsync();
+    var driverResult = await driverQualyCollection.Find(Builders<DriverQualyResults>.Filter.Eq(d => d.driverId, driverId)).ToListAsync();
 
-    return Results.Ok(driverResults);
+    return Results.Ok(driverResult);
 });
 
-app.MapPost("/sync-calendar", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
+app.MapPost("/sync-calendar", async (IHttpClientFactory httpClientFactory) =>
 {
-    var client = httpClientFactory.CreateClient();
-    var response = await client.GetFromJsonAsync<ErgastApiCalendarResponse>("http://ergast.com/api/f1/current.json");
+    var clientFetch = httpClientFactory.CreateClient();
+    var response = await clientFetch.GetFromJsonAsync<ErgastApiCalendarResponse>("http://ergast.com/api/f1/current.json");
+
+    var calendarList = await calendarCollection.Find(new BsonDocument()).ToListAsync();
 
     if (response == null)
         return Results.BadRequest();
 
     foreach (var race in response.MRData.RaceTable.Races)
     {
-        if (!db.Calendar.Any(dbRace => dbRace.raceName == race.raceName))
+        if (!calendarList.Any(dbRace => dbRace.raceName == race.raceName))
         {
-            db.Calendar.Add(new CalendarRace
+
+            await calendarCollection.InsertOneAsync(new CalendarRace
             {
                 raceName = race.raceName,
                 date = race.date,
@@ -221,33 +202,32 @@ app.MapPost("/sync-calendar", async (AppDbContext db, IHttpClientFactory httpCli
         }
     }
 
-    await db.SaveChangesAsync();
-    return Results.Ok(await db.Calendar.ToListAsync());
+    var calendarListUpdated = await calendarCollection.Find(new BsonDocument()).ToListAsync();
+
+    return Results.Ok(calendarListUpdated);
 });
 
-app.MapGet("/calendar", async (AppDbContext db) =>
+app.MapGet("/calendar", async () =>
 {
-    var calendarResults = await db.Calendar
-        .Include(race => race.Qualifying)
-        .Include(race => race.Circuit)
-            .ThenInclude(c => c.Location)
-        .ToListAsync();
+    var calendarList = await calendarCollection.Find(new BsonDocument()).ToListAsync();
 
-    return Results.Ok(calendarResults);
+    return Results.Ok(calendarList);
 });
 
-app.MapPost("/sync-drivers-results", async (AppDbContext db, IHttpClientFactory httpClientFactory) =>
+app.MapPost("/sync-drivers-results", async (IHttpClientFactory httpClientFactory) =>
 {
-    var DriversArray = db.Drivers;
+    var DriversArray = await driversCollection.Find(new BsonDocument()).ToListAsync();
+    var DriversResultsArray = await driversResultsCollection.Find(new BsonDocument()).ToListAsync();
+
 
     foreach (var driver in DriversArray)
     {
         var driverId = driver.driverId;
 
-        var client = httpClientFactory.CreateClient();
-        var response = await client.GetFromJsonAsync<ErgastApiDriverResultsResponse>($"http://ergast.com/api/f1/2024/drivers/{driverId}/results.json");
+        var clientFetch = httpClientFactory.CreateClient();
+        var response = await clientFetch.GetFromJsonAsync<ErgastApiDriverResultsResponse>($"http://ergast.com/api/f1/2024/drivers/{driverId}/results.json");
 
-        if (!db.DriverResults.Any(d => d.driverId == driver.driverId))
+        if (!DriversResultsArray.Any(d => d.driverId == driver.driverId))
         {
             var driverResult = new DriverResult
             {
@@ -320,165 +300,19 @@ app.MapPost("/sync-drivers-results", async (AppDbContext db, IHttpClientFactory 
                 }).ToList()
             };
 
-            db.DriverResults.Add(driverResult);
-            await db.SaveChangesAsync();
+            await driversResultsCollection.InsertOneAsync(driverResult);
         }
     }
+    var driversResultsCollectionUpdated = await driversResultsCollection.Find(new BsonDocument()).ToListAsync();
 
-    var driverResults = await db.DriverResults
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.Time)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.FastestLap)
-                    .ThenInclude(f => f.AverageSpeed)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.Driver)
-        .Include(dr => dr.Races)
-            .ThenInclude(r => r.Results)
-                .ThenInclude(res => res.Constructor)
-          .ToListAsync();
+    return Results.Ok(driversResultsCollectionUpdated);
+});
 
-    return Results.Ok(driverResults);
+app.MapGet("/drivers/{driverId}/results", async (string driverId) =>
+{
+    var driverResult = await driversResultsCollection.Find(Builders<DriverResult>.Filter.Eq(d => d.driverId, driverId)).ToListAsync();
 
+    return Results.Ok(driverResult);
 });
 
 app.Run();
-
-public class ErgastApiDriverResponse
-{
-    public DriverMRData MRData { get; set; }
-}
-
-public class DriverMRData
-{
-    public DriverTable DriverTable { get; set; }
-}
-
-public class DriverTable
-{
-    public List<Driver> Drivers { get; set; }
-}
-
-public class ErgastApiDriverResultsResponse
-{
-    public RaceMRData MRData { get; set; }
-}
-
-public class RaceMRData
-{
-    public RaceTable RaceTable { get; set; }
-}
-
-public class RaceTable
-{
-    public List<Race> Races { get; set; }
-}
-public class ErgastApiCalendarResponse
-{
-    public CalendarMRData MRData { get; set; }
-}
-public class CalendarMRData
-{
-    public RaceTableCalendar RaceTable { get; set; }
-}
-public class RaceTableCalendar
-{
-    public List<RaceInfo> Races { get; set; }
-}
-public class RaceInfo
-{
-    public string raceName { get; set; }
-    public string date { get; set; }
-    public string time { get; set; }
-    public QualifyingTime Qualifying { get; set; }
-    public CalendarCircuit Circuit { get; set; }
-}
-public class QualifyingTime
-{
-    public string date { get; set; }
-    public string time { get; set; }
-}
-
-public class ErgastApiConstructorsResponse
-{
-    public ConstructorMRData MRData { get; set; }
-}
-
-public class ConstructorMRData
-{
-    public ConstructorTable ConstructorTable { get; set; }
-}
-
-public class ConstructorTable
-{
-    public List<ErgastConstructor> Constructors { get; set; }
-}
-
-public class ErgastConstructor
-{
-    public string constructorId { get; set; }
-}
-
-public class ErgastApiTeamResponse
-{
-    public TeamMRData MRData { get; set; }
-}
-
-public class TeamMRData
-{
-    public TeamDriverTable DriverTable { get; set; }
-}
-
-public class TeamDriverTable
-{
-    public List<ErgastTeamDrivers> Drivers { get; set; }
-}
-
-public class ErgastTeamDrivers
-{
-    public string familyName { get; set; }
-    public string givenName { get; set; }
-    public string driverId { get; set; }
-}
-public class ErgastApiQualiResponse
-{
-    public QualyMRData MRData { get; set; }
-}
-
-public class QualyMRData
-{
-    public ErgastQualyRaceTable RaceTable { get; set; }
-}
-
-public class ErgastQualyRaceTable
-{
-    public List<ErgastQualyRaces> Races { get; set; }
-}
-
-public class ErgastQualyRaces
-{
-    public string raceName { get; set; }
-    public ErgastCircuit Circuit { get; set; }
-    public List<ErgastQualifyingResults> QualifyingResults { get; set; }
-}
-
-public class ErgastCircuit
-{
-    public string circuitId { get; set; }
-}
-
-public class ErgastQualifyingResults
-{
-    public string position { get; set; }
-    public ErgastQualyDriver Driver { get; set; }
-}
-
-public class ErgastQualyDriver
-{
-    public string familyName { get; set; }
-    public string givenName { get; set; }
-
-}

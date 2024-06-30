@@ -1,5 +1,56 @@
 
 ###
+POST http://localhost:5041/sync-drivers
+###
+GET http://localhost:5041/drivers
+
+
+
+
+###
+POST http://localhost:5041/sync-drivers-results
+###
+GET http://localhost:5041/drivers/hamilton/results
+
+
+
+
+###
+POST http://localhost:5041/sync-calendar
+###
+GET http://localhost:5041/calendar
+
+
+
+
+###
+POST http://localhost:5041/sync-teams
+###
+GET http://localhost:5041/teams
+
+
+
+
+###
+POST http://localhost:5041/sync-driver-qualy
+###
+GET http://localhost:5041/qualyfying/hamilton/results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###
 POST https://f1-data-api-d7f25ebaa706.herokuapp.com/sync-drivers
 ###
 POST http://localhost:5041/sync-drivers

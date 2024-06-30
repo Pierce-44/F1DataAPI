@@ -486,3 +486,4 @@ $RECYCLE.BIN/
 *.swp
 endpointsTest.http
 endpointsTest.http
+appsettings.json
