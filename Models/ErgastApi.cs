@@ -72,6 +72,7 @@ public class ConstructorTable
 public class ErgastConstructor
 {
   public string constructorId { get; set; }
+  public string name { get; set; }
 }
 
 public class ErgastApiTeamResponse

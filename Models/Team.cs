@@ -7,6 +7,7 @@ public class Team
   public ObjectId Id { get; set; } // MongoDB will automatically generate ObjectId
 
   public string constructorId { get; set; }
+  public string teamName { get; set; }
   public List<TeamDrivers> Drivers { get; set; }
 }
 

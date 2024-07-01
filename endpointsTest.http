@@ -4,7 +4,8 @@ POST http://localhost:5041/sync-drivers
 ###
 GET http://localhost:5041/drivers
 
-
+###
+GET https://f1-data-api-d7f25ebaa706.herokuapp.com/drivers
 
 
 ###
@@ -44,6 +45,14 @@ POST http://localhost:5041/sync-driver-qualy
 ###
 GET http://localhost:5041/qualyfying/hamilton/results
 
+
+
+
+
+###
+POST http://localhost:5041/sync-forums
+###
+GET http://localhost:5041/forums
 
 
 

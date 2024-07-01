@@ -21,6 +21,7 @@ var driversResultsCollection = client.GetDatabase("f1fastfacts").GetCollection<D
 var calendarCollection = client.GetDatabase("f1fastfacts").GetCollection<CalendarRace>("calendar");
 var teamCollection = client.GetDatabase("f1fastfacts").GetCollection<Team>("teams");
 var driverQualyCollection = client.GetDatabase("f1fastfacts").GetCollection<DriverQualyResults>("driverQualyResults");
+var forumsCollection = client.GetDatabase("f1fastfacts").GetCollection<Forum>("forums");
 
 
 builder.Services.AddHttpClient();
@@ -29,8 +30,8 @@ var app = builder.Build();
 
 // REMOVE FOR LOCAL TESTING
 // no need to hide this part always uses 80 now
-var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
-app.Urls.Add($"http://*:{port}");
+// var port = Environment.GetEnvironmentVariable("PORT") ?? "80";
+// app.Urls.Add($"http://*:{port}");
 
 app.MapPost("/sync-drivers", async (IHttpClientFactory httpClientFactory) =>
 {
@@ -87,6 +88,7 @@ app.MapPost("/sync-teams", async (IHttpClientFactory httpClientFactory) =>
             var newTeam = new Team
             {
                 constructorId = team.constructorId,
+                teamName = team.name,
                 Drivers = responseTeam.MRData.DriverTable.Drivers.Select(driverHere => new TeamDrivers
                 {
                     familyName = driverHere.familyName,
@@ -214,6 +216,45 @@ app.MapGet("/calendar", async () =>
     return Results.Ok(calendarList);
 });
 
+app.MapPost("/sync-forums", async () =>
+{
+    var teamList = await teamCollection.Find(new BsonDocument()).ToListAsync();
+    var driversList = await driversCollection.Find(new BsonDocument()).ToListAsync();
+    var forumList = await forumsCollection.Find(new BsonDocument()).ToListAsync();
+
+    foreach (var team in teamList)
+    {
+        var forum = new Forum
+        {
+            forumName = team.teamName,
+        };
+
+        await forumsCollection.InsertOneAsync(forum);
+    }
+
+    foreach (var driver in driversList)
+    {
+        var forum = new Forum
+        {
+            forumName = driver.givenName + "_" + driver.familyName,
+        };
+
+        await forumsCollection.InsertOneAsync(forum);
+    }
+
+    var forumListResponse = await forumsCollection.Find(new BsonDocument()).ToListAsync();
+
+
+    return Results.Ok(forumListResponse);
+});
+
+app.MapGet("/forums", async () =>
+{
+    var forumList = await forumsCollection.Find(new BsonDocument()).ToListAsync();
+
+    return Results.Ok(forumList);
+});
+
 app.MapPost("/sync-drivers-results", async (IHttpClientFactory httpClientFactory) =>
 {
     var DriversArray = await driversCollection.Find(new BsonDocument()).ToListAsync();
@@ -227,80 +268,97 @@ app.MapPost("/sync-drivers-results", async (IHttpClientFactory httpClientFactory
         var clientFetch = httpClientFactory.CreateClient();
         var response = await clientFetch.GetFromJsonAsync<ErgastApiDriverResultsResponse>($"http://ergast.com/api/f1/2024/drivers/{driverId}/results.json");
 
-        if (!DriversResultsArray.Any(d => d.driverId == driver.driverId))
+        var DatabaseDriverInfo = DriversResultsArray
+            .Where(result => result.driverId == driverId)
+            .ToArray();
+
+
+        if (response.MRData.RaceTable.Races.Count > DatabaseDriverInfo[0].Races.Count)
         {
-            var driverResult = new DriverResult
+            for (int i = DriversResultsArray.Count; i < response.MRData.RaceTable.Races.Count; i++)
             {
-                driverId = driverId,
-                Races = response.MRData.RaceTable.Races.Select(apiRace => new Race
+
+                var driverResult = new DriverResult
                 {
-                    raceName = apiRace.raceName,
-                    Circuit = new CircuitDriver
+                    driverId = driverId,
+                    Races = response.MRData.RaceTable.Races.Select(apiRace => new Race
                     {
-                        circuitId = apiRace.Circuit.circuitId,
-                        circuitName = apiRace.Circuit.circuitName
-                    },
-                    Results = apiRace.Results?.Select(apiResult => new Result
-                    {
-                        position = apiResult?.position ?? "unknown",
-                        positionText = apiResult?.positionText ?? "unknown",
-                        points = apiResult?.points ?? "unknown",
-                        grid = apiResult?.grid ?? "unknown",
+                        raceName = apiRace.raceName,
+                        Circuit = new CircuitDriver
+                        {
+                            circuitId = apiRace.Circuit.circuitId,
+                            circuitName = apiRace.Circuit.circuitName
+                        },
+                        Results = apiRace.Results?.Select(apiResult => new Result
+                        {
+                            position = apiResult?.position ?? "unknown",
+                            positionText = apiResult?.positionText ?? "unknown",
+                            points = apiResult?.points ?? "unknown",
+                            grid = apiResult?.grid ?? "unknown",
 
-                        Time = apiResult?.Time != null ? new TimeDetail
-                        {
-                            time = apiResult.Time.time ?? "unknown",
-                            millis = apiResult.Time.millis ?? "unknown"
-                        } : new TimeDetail
-                        {
-                            time = "unknown",
-                            millis = "unknown"
-                        },
-                        FastestLap = apiResult?.FastestLap != null ? new FastestLapDetail
-                        {
-                            AverageSpeed = apiResult.FastestLap.AverageSpeed != null ? new AverageSpeedDetail
+                            Time = apiResult?.Time != null ? new TimeDetail
                             {
-                                speed = apiResult.FastestLap.AverageSpeed.speed ?? "unknown"
-                            } : new AverageSpeedDetail
+                                time = apiResult.Time.time ?? "unknown",
+                                millis = apiResult.Time.millis ?? "unknown"
+                            } : new TimeDetail
                             {
-                                speed = "unknown"
+                                time = "unknown",
+                                millis = "unknown"
+                            },
+                            FastestLap = apiResult?.FastestLap != null ? new FastestLapDetail
+                            {
+                                AverageSpeed = apiResult.FastestLap.AverageSpeed != null ? new AverageSpeedDetail
+                                {
+                                    speed = apiResult.FastestLap.AverageSpeed.speed ?? "unknown"
+                                } : new AverageSpeedDetail
+                                {
+                                    speed = "unknown"
+                                }
+                            } : new FastestLapDetail
+                            {
+                                AverageSpeed = new AverageSpeedDetail
+                                {
+                                    speed = "unknown"
+                                }
+                            },
+                            Driver = apiResult?.Driver != null ? new DriverDetail
+                            {
+                                nationality = apiResult.Driver.nationality ?? "unknown",
+                                dateOfBirth = apiResult.Driver.dateOfBirth ?? "unknown",
+                                permanentNumber = apiResult.Driver.permanentNumber ?? "unknown",
+                                givenName = apiResult.Driver.givenName ?? "unknown",
+                                familyName = apiResult.Driver.familyName ?? "unknown"
+                            } : new DriverDetail
+                            {
+                                nationality = "unknown",
+                                dateOfBirth = "unknown",
+                                permanentNumber = "unknown",
+                                givenName = "unknown",
+                                familyName = "unknown"
+                            },
+                            Constructor = apiResult?.Constructor != null ? new ConstructorDetail
+                            {
+                                name = apiResult.Constructor.name ?? "unknown",
+                                constructorId = apiResult.Constructor.constructorId ?? "unknown"
+                            } : new ConstructorDetail
+                            {
+                                name = "unknown",
+                                constructorId = "unknown"
                             }
-                        } : new FastestLapDetail
-                        {
-                            AverageSpeed = new AverageSpeedDetail
-                            {
-                                speed = "unknown"
-                            }
-                        },
-                        Driver = apiResult?.Driver != null ? new DriverDetail
-                        {
-                            nationality = apiResult.Driver.nationality ?? "unknown",
-                            dateOfBirth = apiResult.Driver.dateOfBirth ?? "unknown",
-                            permanentNumber = apiResult.Driver.permanentNumber ?? "unknown",
-                            givenName = apiResult.Driver.givenName ?? "unknown",
-                            familyName = apiResult.Driver.familyName ?? "unknown"
-                        } : new DriverDetail
-                        {
-                            nationality = "unknown",
-                            dateOfBirth = "unknown",
-                            permanentNumber = "unknown",
-                            givenName = "unknown",
-                            familyName = "unknown"
-                        },
-                        Constructor = apiResult?.Constructor != null ? new ConstructorDetail
-                        {
-                            name = apiResult.Constructor.name ?? "unknown",
-                            constructorId = apiResult.Constructor.constructorId ?? "unknown"
-                        } : new ConstructorDetail
-                        {
-                            name = "unknown",
-                            constructorId = "unknown"
-                        }
-                    }).ToList() ?? new List<Result>()
-                }).ToList()
-            };
+                        }).ToList() ?? new List<Result>()
+                    }).ToList()
+                };
 
-            await driversResultsCollection.InsertOneAsync(driverResult);
+                await driversResultsCollection.InsertOneAsync(driverResult);
+
+            }
+
+
+
+
+
+
+
         }
     }
     var driversResultsCollectionUpdated = await driversResultsCollection.Find(new BsonDocument()).ToListAsync();
